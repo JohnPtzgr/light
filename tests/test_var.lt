@@ -1,0 +1,92 @@
+struct S1 {
+  S1& A;
+  /// S1& B;
+};
+
+fn varff1() {
+  var a = S1{};
+  var b = S2{};
+  a.A = &b;
+  b.A = &a;
+  /// compiler sees that no data can escape, therefore can force-free a and b.
+}
+
+fn varff2a(var a) {
+  print(a); /// <- uses cycleless ref (compiler deduced: print calls __str__ method and does not pass this reference)
+  /// therefore itself is cycleless
+}
+
+fn varff2b() {
+  var a = S1{};
+  varff2a(a); <- cycleless ref therefore no leaks
+}
+
+struct treeNode<T> { /// with left < root <= right
+  T value;
+  treeNode& left;
+  treeNode& right;
+
+  static fn lbound<T>(treeNode<T>& self, T value) -> treeNode<T>& {
+    if self.value < value {
+      if self.right! {
+        return lbound<T>(self.right, value);
+      }
+      return self;
+    }
+    if self.value > value {
+      if self.left! {
+        return lbound<T>(self.left, value);
+      }
+      return self;
+    }
+    return self;
+    /// does not leak refs besides iself
+  }
+
+  static fn ubound<T>(treeNode<T>& self, T value) -> treeNode<T>& {
+    if self.value > value {
+      if self.right! {
+        return ubound<T>(self.right, value);
+      }
+      return self;
+    }
+    if self.value < value {
+      if self.left! {
+        return ubound<T>(self.left, value);
+      }
+      return self;
+    }
+    return self;
+    /// does not leak refs besides iself
+  }
+
+  static fn link(treeNode<T>&'a self, treeNode<T>& other) {
+    if self.value <= other.value {
+      if self.right! {
+        tmp_node_ref = self.right;
+        self.right = other;
+        
+      } else {
+        self.right = other;
+      }
+    }
+  }
+};
+
+class Tree<T> {
+  treeNode<T>& root;
+
+  fn add
+};
+
+fn varff3
+
+
+
+fn main(...) -> i32 {
+  '"';
+  let s := u8"abcd"std::bigi;
+  let abc = f"ab{s + f"{abc}"}c";
+  let i := 0o12345678;
+  return 0;
+}

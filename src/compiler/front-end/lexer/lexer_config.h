@@ -1,0 +1,216 @@
+#include "lexer_.h"
+
+
+typedef enum TOKEN_KIND_ENUM {
+  TOKEN_DOT = 1,
+  TOKEN_COMMA,
+  TOKEN_UNDERSCORE,
+  TOKEN_COLON,
+  TOKEN_SEMICOLON,
+  TOKEN_AT,
+  TOKEN_HASH,
+  TOKEN_DOLLAR,
+  TOKEN_PERCENT,
+  TOKEN_CARET,
+  TOKEN_AMPERSAND,
+  TOKEN_STAR,
+  TOKEN_PLUS,
+  TOKEN_MINUS,
+  TOKEN_SLASH,
+  TOKEN_BACKSLASH,
+  TOKEN_PIPE,
+  TOKEN_TILDE,
+  TOKEN_EXCLAMATION,
+  TOKEN_QUESTION,
+  TOKEN_EQUAL,
+  TOKEN_LESS,
+  TOKEN_GREATER,
+  TOKEN_SPACE,
+  
+  /* Brackets and delimiters */
+  TOKEN_LPAREN,
+  TOKEN_RPAREN,
+  TOKEN_LBRACKET,
+  TOKEN_RBRACKET,
+  TOKEN_LBRACE,
+  TOKEN_RBRACE,
+  TOKEN_QUOTE,
+  TOKEN_DOUBLEQUOTE,
+
+  TOKEN_SINGLE_CHAR_BOUNDARY,
+  
+  /* Multi-character operators (single char variants above) */
+  TOKEN_CMPEQ,
+  TOKEN_CMPNEQ,
+  TOKEN_CMPLESEQ,
+  TOKEN_CMPGRTEQ,
+  TOKEN_ASSIGNADD,
+  TOKEN_ASSIGNSUB,
+  TOKEN_ASSIGNSUM,
+  TOKEN_ASSIGNMUL,
+  TOKEN_ASSIGNDIV,
+  TOKEN_ASSIGNMOD,
+  TOKEN_BTWSOR,
+  TOKEN_BTWSAND,
+  TOKEN_BTWSNOT,
+  TOKEN_BTWSXOR,
+  TOKEN_ARROW,        /* ->  */
+  TOKEN_DBLARROW,     /* =>  */
+  TOKEN_INCREMENT,    /* ++  */
+  TOKEN_DECREMENT,    /* --  */
+  TOKEN_DBLDOT,       /* ..  */
+  TOKEN_TRPLDOT,      /* ... */
+  TOKEN_DBLCOLON,     /* ::  */
+
+  /* Non-delimiting tokens */
+  TOKEN_IDENTIFIER,
+  TOKEN_DIGITS,
+  TOKEN_INDENT,
+  TOKEN_DEDENT,
+  TOKEN_CONTLINE,
+  TOKEN_LITERAL,
+  TOKEN_STRING,
+  TOKEN_FSTRING_BEG,
+  TOKEN_FSTRING_END,
+  TOKEN_FSTRING_CONTENT,
+  TOKEN_FSTRING_INTERPOL_BEG,
+  TOKEN_FSTRING_INTERPOL_END,
+  TOKEN_CHAR,
+  TOKEN_COMMENTBEG,
+  TOKEN_COMMENTEND,
+
+  /* Keywords */
+  TOKEN_KWIF,
+  TOKEN_KWELSE,
+  TOKEN_KWWHILE,
+  TOKEN_KWFOR,
+  TOKEN_KWRETURN,
+  TOKEN_KWFUNCTION,
+  TOKEN_KWLET,
+  TOKEN_KWCONST,
+  TOKEN_KWSTRUCT,
+  TOKEN_KWENUM,
+  TOKEN_KWIMPORT,
+  TOKEN_KWTRUE,
+  TOKEN_KWFALSE,
+  TOKEN_KWNIL,
+  TOKEN_KWERROR,
+  TOKEN_KWBREAK,
+  TOKEN_KWCONTINUE,
+  TOKEN_KWMATCH,
+  TOKEN_KWPUBLIC,
+  TOKEN_KWPRIVATE,
+  TOKEN_KWPROTECTED,
+  TOKEN_KWSTATIC,
+
+  /* UNIFIED AST TOKENS */
+  // TOKEN_LITERAL,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+  // TOKEN_,
+
+  /* End marker */
+  TOKEN_EOF = UINT16_MAX - 2,
+  TOKEN_ERROR = UINT16_MAX - 1,
+  TOKEN_EMPTY = 0,
+  TOKEN_ANY = UINT16_MAX
+} TOKEN_KIND_ENUM;
+
+
+/* Single-character delimiter definitions */
+#define DEF_LIST_DELIM_SYM \
+  DEF_SYM(DOT, ".") \
+  DEF_SYM(COMMA, ",") \
+  DEF_SYM(UNDERSCORE, "_") \
+  DEF_SYM(COLON, ":") \
+  DEF_SYM(SEMICOLON, ";") \
+  DEF_SYM(AT, "@") \
+  DEF_SYM(HASH, "#") \
+  DEF_SYM(DOLLAR, "$") \
+  DEF_SYM(PERCENT, "%") \
+  DEF_SYM(CARET, "^") \
+  DEF_SYM(AMPERSAND, "&") \
+  DEF_SYM(STAR, "*") \
+  DEF_SYM(PLUS, "+") \
+  DEF_SYM(MINUS, "-") \
+  DEF_SYM(SLASH, "/") \
+  DEF_SYM(BACKSLASH, "\\") \
+  DEF_SYM(PIPE, "|") \
+  DEF_SYM(TILDE, "~") \
+  DEF_SYM(EXCLAMATION, "!") \
+  DEF_SYM(QUESTION, "?") \
+  DEF_SYM(EQUAL, "=") \
+  DEF_SYM(LESS, "<") \
+  DEF_SYM(GREATER, ">") \
+  DEF_SYM(SPACE, " ") \
+  DEF_SYM(LPAREN, "(") \
+  DEF_SYM(RPAREN, ")") \
+  DEF_SYM(LBRACKET, "[") \
+  DEF_SYM(RBRACKET, "]") \
+  DEF_SYM(LBRACE, "{") \
+  DEF_SYM(RBRACE, "}") \
+  DEF_SYM(QUOTE, "\'") \
+  DEF_SYM(DOUBLEQUOTE, "\"")
+
+
+#define DEF_COMMENT_BLOCK_1           '/'
+#define DEF_COMMENT_BLOCK_2           '.'
+#define DEF_COMMENT_BEGIN_AS_TOK      (uint16_t[]){TOKEN_SLASH, TOKEN_DOT} //  /.
+#define DEF_COMMENT_END_AS_TOK        (uint16_t[]){TOKEN_DOT, TOKEN_SLASH} //  ./
+#define DEF_COMMENT_SINGLE            "///"
+#define DEF_TAB_LENGTH                2
+#define DEF_INDENT_CONT_TOKENS        (uint16_t[]){TOKEN_BACKSLASH, TOKEN_COMMA}
+#define DEF_INDENT_CONT_BY_PAREN      1
+#define DEF_INDENT_CONT_BY_BRACKET    1
+#define DEF_INDENT_CONT_BY_BRACE      1
+#define DEF_RAW_STR_ESCAPE_MAX_LEN    256
+#define DEF_FSTR_BEG_INTERPOL_AS_TOK  (uint16_t[]){TOKEN_DOLLAR, TOKEN_LBRACE} // ${
+#define DEF_FSTR_END_INTERPOL_AS_TOK  (uint16_t[]){TOKEN_RBRACE}               // }
+
+
+/* Keyword symbol definitions */
+#define DEF_LIST_KEYWORD_SYM \
+  DEF_SYM(KWIF, "if") \
+  DEF_SYM(KWELSE, "else") \
+  DEF_SYM(KWWHILE, "while") \
+  DEF_SYM(KWFOR, "for") \
+  DEF_SYM(KWRETURN, "return") \
+  DEF_SYM(KWFUNCTION, "fn") \
+  DEF_SYM(KWLET, "let") \
+  DEF_SYM(KWCONST, "const") \
+  DEF_SYM(KWSTRUCT, "struct") \
+  DEF_SYM(KWENUM, "enum") \
+  DEF_SYM(KWIMPORT, "import") \
+  DEF_SYM(KWTRUE, "true") \
+  DEF_SYM(KWFALSE, "false") \
+  DEF_SYM(KWNIL, "nil") \
+  DEF_SYM(KWBREAK, "break") \
+  DEF_SYM(KWCONTINUE, "continue") \
+  DEF_SYM(KWMATCH, "match") \
+  DEF_SYM(KWPUBLIC, "pub") \
+  DEF_SYM(KWPRIVATE, "priv") \
+  DEF_SYM(KWPROTECTED, "prot") \
+  DEF_SYM(KWSTATIC, "static") \
+  DEF_SYM(ARROW, "->") \
+  DEF_SYM(DBLARROW, "=>") \
+  DEF_SYM(ASSIGNADD, "+=") \
+  DEF_SYM(ASSIGNSUB, "-=") \
+  DEF_SYM(ASSIGNMUL, "*=") \
+  DEF_SYM(ASSIGNDIV, "/=") \
+  DEF_SYM(ASSIGNMOD, "%=") \
+  DEF_SYM(CMPEQ, "==") \
+  DEF_SYM(CMPNEQ, "!=") \
+  DEF_SYM(CMPGRTEQ, ">=") \
+  DEF_SYM(CMPLESEQ, "<=") \
+

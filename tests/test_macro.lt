@@ -1,0 +1,50 @@
+constexpr fn linked_list(t: type) {
+  @quote(
+    struct linked_list_node_$t {
+      value: $t;
+      next: linked_list_node_$t&;
+    }
+    pub struct linked_list_$t {
+      head: linked_list_node_$t&;
+      size: usize;
+     pub:
+      fn push_back(self: linked_list_$t&, value: const $t&)!;
+      fn push_front(self: linked_list_$t&, value: const $t&)!;
+      fn insert(self: linked_list_$t&, index: usize, value: const $t&)!;
+      fn pop_back(self: linked_list_$t&) -> $t?;
+      fn pop_front(self: linked_list_$t&) -> $t?;
+      fn remove(self: linked_list_$t&, index: usize) -> $t?;
+    }
+    @ifndef(linked_list_$(t)_impl)
+    impl linked_list_$t {
+      @define(linked_list_$(t)_impl)
+    }
+    @endif
+    let v: $t = nil;
+  )
+}
+
+@linked_list(i32);
+
+
+static alloc_table = std::algo::hashset{};
+
+
+@effect(acquire, global(alloc_table))
+i32 my_alloc(size: usize) -> ptr? {
+  ptr result = std::sys::malloc(size)?;
+  alloc_table.add(result);
+  return result;
+}
+
+@effect(release, global(alloc_table))
+i32 my_free(data: ptr)? {
+  alloc_table.remove(data);
+  std::sys::free(data)?;
+}
+
+
+s: string = u"dasdadas"""""""""""     dsffsdfds";
+
+
+str = prefix?"a?({}?b?)*"postfix?

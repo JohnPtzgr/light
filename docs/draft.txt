@@ -1,0 +1,482 @@
+Light (.lt) is a general purpose programming language, heavily inspired by C, Python, C++, Rust, Zig and Lua.
+This influence has guided the key notions and concepts:
+
+1) Strict type safety:
+
+  * Only a few conditions allow implicit (warning- and error-free) casting:
+    1) Integer up convertions
+    2) Integer signed to unsigned convertions
+    3) Integer unsigned to signed safe convertions
+    4) Integer to number safe conversions
+    5) Number to integer safe conversions
+    6) Float up convertions
+    7) Float to number safe conversions
+    8) Number to float safe conversions
+    9) Any:::implToBool to bool convertions
+    10) Any:::implToInt to i64 convertions
+    11) Any:::implToString to str convertions
+    12) Var to any safe conversions
+    13) Any to var safe conversions
+    14) Same type conversions
+    15) Any from any& conversions
+    16) Any& from any conversions
+
+  
+  * Only one conversion is allowed to achieve a strict type equality
+  * up convertions - to the type no smaller than the original type
+    {
+      a: i32 = 'l'; // ch8 is up promoted to i32
+    }
+  * safe convertions - if the target type that can fully represent the original value. (
+    Requires compile-time value invariants to be in place.
+  )
+    {
+      a: num24 = 8; // 8 fits in into num24 without any loss of precision
+      var b = 9; // b now contains a reference to the i32 value 9 and the type object of i32
+    }
+  * same type convertions - to the type created via 'using' or 'enum' expressions as an alias to the target type or vice versa
+    {
+      ai: i64 = (int)2.0;
+      bu: u64 = (uint)2.0;
+      cf: f64 = (float)2.0;
+      dn: num53 = (num)2.0;
+    }
+
+
+  As You can see, not a lot. And this is for a very good reason.
+
+2) Explicitness:
+
+  A lot of things are required to be explicit:
+
+    * Arithmetic Types
+      {
+        a: i32 = 0; // i32 is a 32 bit integer
+        // Same goes for i16, i64, f16, f32, f64, d16, d32, ...
+        // Exceptions are numeric types, which specify only the signed mantissa size
+        // Other exceptions: int, float, num, dec. All of them are 64 bit versions of respective fixed-sized types
+      }
+
+    * Type casting
+      {
+        a: i32 = ()1.0; // explicit cast to implied i32
+        auto b = (i64)1.0; // explicit cast to i64 implies the type of b
+      }
+
+
+    * Separate definition and declaration of classes and structs:
+      {
+        pub struct S {
+          a: i32;
+          b: i32;
+        }
+
+        impl S {
+          S::S(self: S&) { // constructor is obligatory for invariants, therefore it has the same visibility as the struct(pub)
+            self.a = 0;
+            self.b = 0;
+          }
+          S::~S(self: S&) {}
+        }
+      }
+
+
+    * Private/protected/public visibility ( As shown in the example above. By default everything is protected. )
+      {
+        pub mod M {
+          struct Foo { // visible to all functions in M
+            i32 bar;
+          }
+          impl Foo {
+            pub fn baar() {} // visible to all functions in M
+            prot fn baaar() {} // visible to all functions in M
+            priv fn baaaar() {} // visible only to functions in M::Foo
+          }
+
+          pub struct Bar { // visible to all functions
+            i32 foo;
+          }
+
+          impl Bar {
+            pub fn baar() {} // visible to all functions
+            prot fn baar() {} // visible to all functions in M
+            priv fn baar() {} // visible only to functions in M::Bar
+          }
+
+
+          fn foo() { // visible to all functions in M
+            pri32("Hello, World!");
+          }
+
+          priv fn bar() { // only visible to protected or private functions of M
+            pri32("Hello, World!");
+          }
+
+          prot fn foobar() { // same as foo
+            pri32("Hello, World!");
+          }
+
+          pub barfoo() {
+            pri32("Hello, World!");
+          }
+
+
+          i32 MModConst = 0;
+        }
+        pub fn main() -> i32 {
+          return 0;
+        }
+
+      }
+
+
+    * Function definitions and templates
+      {
+        mod A { // simplest definitions
+
+          pub fn foo() {} // simplest function
+
+          pub fn foo2() -> void {} // same function with explicit void return type
+
+          pub auto foo3 = fn () {} // same function as a global variable created from lambda function
+
+        }
+        mod B { // something more complex
+
+          pub fn echo(a: var) -> var { return a; } // dynamically accepts a variable 'a' and returns it. Compiled and linked
+
+          // pub fn echo(a: i32) -> i32 { return a; } <- overwrites previous definition and therefore results in CE
+
+          pub fn echo<type T>(a: T&) -> T& { return a; } // conceptually the same as the previous definition, but is compiled per each echo<T> signature used. Same as C++ templates
+
+          pub fn echo<>(a: i32) -> i32 { return a; } // overloads echo with i32 -> i32 signature
+
+          pub fn echo<>(a: i32) -> f32 { return a; } // overloads echo with i32 -> f32 signature
+
+          pub fn echo<>(a: i64) -> i64 { return a; } // overloads echo with i64 -> i64 signature
+
+          // As you can see relevant signature is formed from template arguments, input and output parameter types.
+          // During the call the order in which function definitions are tested is as follows:
+          //   1) Full signature match
+          //   2) Full signature match after 0-1 implicit output signature cast
+          //   3) Full template signature match
+          //   4) Full signature match after 0-1 implicit cast
+          //   5) Full template signature match after 0-1 implicit output signature cast
+          //
+          // Reference of type and the type are considered the same signature
+          //
+
+          pub main() {
+            _ = echo(1); // since no explicit echo<>(num) was provided, due to 3), echo(num&) -> num&
+            _: i32 = echo(1i); // full signature is matched, therefore by 1) echo(i32) -> i32
+            _: i64 = echo(1i); // input signature is matched, i32 to i64 implicit cast, therefore by 2) echo(i32) -> i32
+            // _: i32 = echo(1si); // i16 can be implicitly promoted to i32 or var so 2 options are possible
+            _: f64 = echo(1lf); // implicit convertion to var forces 4) echo(var) -> var
+
+            // obviously option 5) is impossible for echo, since every argument is cast to var, before applying template with output type cast
+            _: f64 = echo<f64>(1); // explicit template call of echo(f64&) -> f64&
+
+          }
+
+        }
+      }
+
+
+    * global / extern variable qualifiers
+      {
+        pub fn foo(i32 in) {
+
+          // Some code here
+
+          // Declare external symbols, passed by strong reference
+          global barG; // typeof(barG) will return type of barG from declaration
+          extern barE; // typeof(barE) is var&', since the function accepts any external symbol with name barE from caller's scope
+
+          // other code(that may use barG or barE) here
+
+        }
+      }
+
+
+    * return values, variables, arguments, match expressions, _
+      {
+        // Every non void return value has to be accepted
+        // Every non-void function has to return
+        // Every declared variable, passed argument has to be used
+        // Every possible match case has to be exhausted
+        // To simlify the process an explicit discard is used
+
+        pub fn add(i32 a, i32 b) -> i32 {
+          return a + b;
+        }
+
+        _ = add(1, 2); // adds 1 and 2 together, returning 3, that is expliitly discarded
+      }
+
+
+    * variable is required to be initialized with some value at definition
+      {
+        // i32 foo; <- fails because foo is not initialized
+        i32 foo = 0;
+      }
+
+
+3) Safe resource management:
+  Just like Rust, Light implements safe/unsafe mechanisms, much simpler nonetheless.
+
+  * Defer
+    {
+      unsafe pub fn foo() {
+        a := std::th::pth_mutex();
+        a.lock();
+        defer a.unlock();
+      }
+    }
+
+  * Safe / unsafe
+    {
+      // As show in previous example some syntax and patterns are considered unsafe and have to be marked accordingly.
+      // The mechanism outlines two distinct qualifiers:
+      //   1) safe <- allows to call unsafe functions or have unsafe private fields in designated unsafe sections
+      //   2) unsafe <- allows to use mutexes, raw pointers, external global symbols, and etc.
+      //
+      // In order for function/struct/class to be called safe, it has to maintain some safety invariants, that have to hold during lifetime:
+      //   1) No unaccounted resource can be created
+      //   2) No unaccounted resource can be destroyed
+      //   3) No unaccounted resource can be returned/passed out of scope of the 'safe' function
+      // 
+      // Additionally, as mentioned above any unsafe function call / unsafe variable used has to be inside unsafe block;
+      // unsafe fields in safe struct/class are required to be private.
+      // 
+      // Only safe and unqualified functions and structs can be used in unqualified functions and structs.
+
+      
+      unsafe pub fn foo() {
+        auto a = std::th::pth_mutex();
+        a.lock();
+        defer a.unlock();
+      }
+      // Even though foo does not create or destory resources, it does not wrap unsafe methods .lock() and .unlock() in unsafe block, therefore it is unsafe
+      
+      safe pub fn bar() {
+        unsafe {
+          foo();
+        }
+      }
+      // Since foo does not create or destory resources and foo is wrapped in unsafe block, it can be marked safe
+
+      pub fn foobar() {
+        bar(); // bar is marked as safe
+      }
+
+    }
+
+  * Since structs and classes can be modified with invariants, resource management can be based on those invariants
+
+  * Passing reference with a variable lifetime provides additional protections against accessing deallocated memory
+
+
+4) Expressiveness:
+
+  * Rich built-in types and classes
+  * High level nature of Light granted by its compiler allows for simpler, shorter, more intuitive code with lots of abstractions
+  * Due to limitations put on operator overloading, struct methods and etc., code is easily readable and concise
+  * Dedicated not overloadable operators for error checking, field access and etc. improve code clarity and reduce amount of possible points of mistake
+
+
+5) Compile time is free time:
+
+  * Light is driven by compile time execution.
+    {
+      // Since compile time code execution / computation is preferred, Light offers constexpr keyword that allows to perform compile time code execution
+    
+      constexpr pub fn add(a: i32, b: i32) -> i32 {
+        return a + b;
+      }
+
+      pub fn main() {
+        constexpr x: i32 = @add(1, 2); // since function add is a constexpr and its arguments are also constexpr, x is 3 at compile time
+      }
+
+    }
+  
+  * Additionally, Light provides templates, variadic recursive templates actually. Just like in C++ this leads to an extremely powerful tool, especially if paired with macros
+
+6) Morphable
+
+  * Talking about the macros, huh? Well, the best is saved for last, as always.
+    {
+      // Macros are an extremely powerful tool, that by design is intented to modify the language to the point of no recognition
+
+      // Macros are split into two categories:
+      //    1) Declarative macros
+      //    2) Procedural macro
+      //
+      // The first one is just a sophisticated (ctrl + F) + (ctrl + alt + enter)
+
+      using TRUE as true;
+      using regex(\"Hello\, World\!\") as "Hi!";
+      using macro add(a: any, b: any) {
+        @match(@type(a)) {
+          i64: a + (i64)b,
+          _: nil
+        }
+      }
+
+      // Notice, that sum is recursive and variadic
+      using macro sum() { ((num)0); }
+      using macro sum(a: num, ... ) {
+        a + sum(...);
+      }
+
+      // Another interesting macro is undef
+
+      undef true; // forbids true
+      undef regex([0-9]); // forbids numbers from 0 to 9
+
+      // What it does, is forbid the expression expr (in 'undef expr;') from being used in the code below the undef.
+      // If expr appears in code below 'undef expr;' the compilation will fail
+
+      // However the actual macro might comes from the procedural macro.
+      // Essentially it is able to accept an expression as a whole, process it during compilation and return the resulting expression, before declarative macros are processed.
+      // This gives the user the power to customize the language
+
+      // Additionally Light provides decorators - constexpr functions, that accept initial function/class/struct object as a parameter and return a transformed object
+
+      constexpr pub fn decLog(f: function<type T, ..., type U>) {
+        pub fn wrapper(T arg1, ...) -> U {
+          println("A");
+          var result = f(arg1, ...);
+          println("B");
+          return result
+        }
+        return wrapper;
+      }
+
+      @decLog
+      pub add(a: i32, b: i32) -> i32 {
+        return a + b;
+      }
+
+
+    }
+
+
+To support safety, clarity and expressiveness of Light, it has to have a lot of built-in types:
+
+1) Arithmetic types
+2) Nil
+3) Lambda
+4) String
+5) Range
+6) View
+7) Reference
+8) Life Time Reference
+9) Iterator
+10) Array types
+11) Smart Pointer types
+12) Raw Pointer types
+13) Function
+14) Coroutine
+15) Allocator
+16) Tuple
+17) Dict
+18) Table
+19) Object
+20) Result/Optional
+21) Exceptions
+22) Var
+23) IOStream
+24) File
+25) Environment
+26) Initializer List
+27) Trait
+28) Module
+29) Struct
+30) Class
+31) Macro
+32) Enum
+33) Module
+34) Type
+35) Data
+36) Machine
+37) Union
+38) Hash types
+39) Token/parser types
+40) Thread
+41) Fiber
+42) Promise
+43) Socket
+44) Pipe
+45) Descriptor
+46) Slice
+47) Bit types
+48) Mutex
+49) Semaphore
+50) Fence
+51) StackTrace
+52) SourceLocData
+53) Date/time
+54) Serial
+55) JSON-object
+56) State
+57) Event
+58) Invariant
+
+
+Literals:
+  1) Suffix literals
+  2) Compound literals
+
+  Lets start with the latter. Compound literals have the following syntax:
+    *** type{Anonymous params*, Named params} ***
+  e.g. *** a := i32{1}; *** or *** S := myStruct{1, .myField2 = 2}; ***
+  
+  Suffix literals are super straight forward.
+    There are only two types of them:
+      1) numeric, e.g. *** a: i32 = 4i; *** or *** b: i64 = 1l; ***
+      2) string, e.g. *** s := "abd"utf8 ***
+    Of course there are default numeric types:
+      1) 1 - is i32 literal
+      2) 1.0 - is double literal
+      3) "1" - is str literal (C string)
+    All types can have custom literals, both numeric and string literals. Local namespaces (e.g. mod) are supported through "namespace::literal":
+    *** 2std::bigi *** or *** "4234234834982382948349283492"std::bigi ***, where bigi is a literal for std::bigint.
+    Integer literals have additional syntax (with prefixes):
+      1) 0xXXXXXXXX <- hex literal
+      2) 0oXXXXXXXX <- octal literal
+      3) 0bXXXXXXXX <- binary literal
+    For convenience numeric literals can have i/u/f/d/l/lu suffixes for (i32/u32/f32/f64/i64/u64).
+    String literals also have prefixes:
+      1) b"..." <- bytearray literal ({[byte]; usize})
+      2) uX"..." <- utf-X literal ({[byte]; [usize]; usize})
+      3) c"..." <- C-style string ([byte] with '\0' at the end)
+      4) f"...{...}..." <- format string literal
+      5) r"..." <- raw string, no escape needed
+    All of the string prefixes can be combined. Additionally, prefixes determine the string literal argument type.
+    This means, that whenever we write X"..."some_type_literal, what really happens is type::some_type_literal(X"...") called.
+    Exceptions are utfX, iX, uX, fX, fXmYe and other built-in numeric type suffixes. They do not require prefixes for string literals.
+    
+
+var type:
+  For fully dynamic variables (Python-like) and dynamic generics Light provides var type. It stores both value and type.
+
+
+SoA types:
+
+enum/union/struct/class[] Name {
+  ...
+};
+
+It creates a struct of arrays for each of the fields, allowing the compiler and CPU to serialize the data and use SIMD optimizations.
+
+The type is written then as []Name.
+
+Therefore the compelete array structure variety looks like:
+  [Name] <- array of Name
+  [Name; N] <- array of N elements of Name
+  [Name:] <- slice
+  [Name: a..b] <- slice from a to B
+  []Name <- Name soa-array
+  [N]Name <- Name soa-array of N elements
+

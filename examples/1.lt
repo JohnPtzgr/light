@@ -1,0 +1,21 @@
+
+T sum<T>(T args...) {
+  T cnt = 0;
+  for (T i : args) {
+    cnt += i;
+  }
+                                                       ;
+  return cnt;
+}
+
+T... unpack<T>(std::iterator<T> iterator) {
+  return iterator;
+}
+
+var... unpack<>(std::iterator<var> iterator) {
+  return iterator;
+}
+
+/. /.ABC./ ./
+
+print(sum(1, 2, 3)); /// >>> 6
