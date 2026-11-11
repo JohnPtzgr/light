@@ -2,7 +2,7 @@
 
 ## The One-Sentence Definition
 
-> **Light is a graduated systems language where safety, speed, efficiency, and flexibility are the default — not the result of expert discipline.**
+> **Light is a graduated systems language where transparency, safety, speed, efficiency, and flexibility are the default, enabled by the declarative nature.**
 
 ---
 
@@ -34,7 +34,8 @@
 
 ### Memory
 - Per-context pools
-- **`let`** → N CT-known stacks, u32 offsets, extendable top element, size-customizable pools (S0), support variable affinity to allow S0 > 4GiB, local
+- **`let`** → N CT-known stacks, u32 offsets, extendable top element,
+     size-customizable pools (S0), support variable affinity to allow S0 > 4GiB, local
 - **`let!`** → heap, u32 offsets, size-customizable pools (S1), support variable affinity to allow S1 > 4GiB, local
 - **`shared let`** → M CT-known stacks, u64 offsets, extendable top element, can be shared
 - **`shared let!`** → heap, u64 offsets, shared
@@ -88,6 +89,7 @@
 - `var` provides python-style runtime typing
 - `autoref` adds an escape hatch for complex reference topology, through scoped GC
 - Reflection (:type) and `dyntype` offer runtime type support if necessary
+- `eval()` and `run()` for sandboxed code execution in RT
 - All necessary types and data structures like arrays, dictionaries, sets, strings, tuples are built-in
 
 ### Verification
@@ -95,7 +97,7 @@
 - Axioms (user-defined, recursive, scoped, assumed true, spot-checked)
 - SAT-solver (linear only, literal × variable)
 - WCET/BCET from ACM
-- `-fsafety-critical` mode (deterministic, exhaustive verification)
+- `-fsafety-critical` mode (deterministic, stronger verification, mandatory WCET)
 
 ### Interop
 - C+- dialect (GCC extensions + generics, total back-compatibility with C11)
